@@ -14,7 +14,14 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
     exists = db.query(Customer).filter(Customer.name == payload.name).first()
     if exists:
-        raise HTTPException(status_code=400, detail="Customer already exists")
+        # idempotent: update basic fields if provided and return
+        if payload.industry is not None:
+            exists.industry = payload.industry
+        if payload.region is not None:
+            exists.region = payload.region
+        db.commit()
+        db.refresh(exists)
+        return exists
     c = Customer(name=payload.name, industry=payload.industry, region=payload.region)
     db.add(c)
     db.commit()

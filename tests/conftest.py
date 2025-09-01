@@ -1,11 +1,15 @@
 import os
+from pathlib import Path
+import pytest
+from fastapi.testclient import TestClient
 
-# Use a dedicated test database
+# Use a dedicated test database and reset it for each test session
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///./test.db")
+Path("test.db").unlink(missing_ok=True)
 
-# Ensure models are imported so Base.metadata is populated
-from app import models  # noqa: F401,E402
-from app.db.database import Base, engine  # noqa: E402
-
-# Create tables before tests
-Base.metadata.create_all(bind=engine)
+# Provide a TestClient that ensures FastAPI startup/shutdown events run
+@pytest.fixture(scope="session")
+def client():
+	from app.main import app
+	with TestClient(app) as c:
+		yield c

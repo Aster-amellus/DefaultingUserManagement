@@ -10,22 +10,37 @@ from app.core.config import settings
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def ensure_admin(db: Session):
-    admin = db.query(User).filter(User.email == settings.admin_default_email).first()
-    if not admin:
-        admin = User(
+def ensure_seed_users(db: Session):
+    # Admin
+    if not db.query(User).filter(User.email == settings.admin_default_email).first():
+        db.add(User(
             email=settings.admin_default_email,
             full_name="Admin",
             hashed_password=get_password_hash(settings.admin_default_password),
             role=RoleEnum.admin.value,
-        )
-        db.add(admin)
-        db.commit()
+        ))
+    # Reviewer
+    if not db.query(User).filter(User.email == settings.reviewer_default_email).first():
+        db.add(User(
+            email=settings.reviewer_default_email,
+            full_name="Reviewer",
+            hashed_password=get_password_hash(settings.reviewer_default_password),
+            role=RoleEnum.reviewer.value,
+        ))
+    # Operator
+    if not db.query(User).filter(User.email == settings.operator_default_email).first():
+        db.add(User(
+            email=settings.operator_default_email,
+            full_name="Operator",
+            hashed_password=get_password_hash(settings.operator_default_password),
+            role=RoleEnum.operator.value,
+        ))
+    db.commit()
 
 
 @router.post("/token", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    ensure_admin(db)
+    ensure_seed_users(db)
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")

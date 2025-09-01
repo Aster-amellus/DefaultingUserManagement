@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     admin_default_email: str = "admin@example.com"
     admin_default_password: str = "admin123"
 
+    reviewer_default_email: str = "reviewer@example.com"
+    reviewer_default_password: str = "reviewer123"
+
+    operator_default_email: str = "operator@example.com"
+    operator_default_password: str = "operator123"
+
     # Storage config
     storage_backend: str = "local"  # local | s3
     local_storage_dir: str = "./uploads"

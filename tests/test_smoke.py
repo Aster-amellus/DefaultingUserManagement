@@ -1,24 +1,22 @@
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+from typing import Generator
+import pytest
 
 
-client = TestClient(app)
-
-
-def get_token():
+def get_token(client: TestClient):
     r = client.post("/auth/token", data={"username": "admin@example.com", "password": "admin123"})
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 
 
-def test_health():
+def test_health(client: TestClient):
     r = client.get("/health")
     assert r.status_code == 200
 
 
-def test_flow():
-    token = get_token()
+def test_flow(client: TestClient):
+    token = get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     # create customer

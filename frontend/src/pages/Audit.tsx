@@ -1,4 +1,4 @@
-import { Card, DatePicker, Input, Select, Space, Table, message } from 'antd'
+import { Card, DatePicker, Input, Space, Table, message } from 'antd'
 import dayjs, { Dayjs } from 'dayjs'
 import { useEffect, useState } from 'react'
 import { http } from '../lib/http'
@@ -23,16 +23,18 @@ export default function Audit() {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await http.get('/audit-logs', {
+      const { data } = await http.get('/audit-logs/', {
         params: {
-          actor,
           action,
           start: from?.toISOString(),
           end: to?.toISOString(),
         }
       })
       setData(data.items || data)
-    } catch { message.error('获取失败') } finally { setLoading(false) }
+    } catch (e: any) {
+      if (e?.response?.status === 401) message.error('无权限查看审计日志')
+      else message.error('获取失败')
+    } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])

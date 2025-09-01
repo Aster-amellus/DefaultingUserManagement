@@ -1,12 +1,8 @@
 from datetime import datetime
 from fastapi.testclient import TestClient
-from app.main import app
 
 
-client = TestClient(app)
-
-
-def login(email: str, password: str) -> str:
+def login(client: TestClient, email: str, password: str) -> str:
     r = client.post("/auth/token", data={"username": email, "password": password})
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
@@ -16,9 +12,9 @@ def auth_header(token: str):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_end_to_end():
+def test_end_to_end(client: TestClient):
     # 1) admin login (auto-created on first login)
-    admin_token = login("admin@example.com", "admin123")
+    admin_token = login(client, "admin@example.com", "admin123")
 
     # 2) admin creates reviewer and operator users
     r = client.post(
@@ -35,8 +31,8 @@ def test_end_to_end():
     )
     assert r.status_code == 200, r.text
 
-    reviewer_token = login("reviewer@example.com", "rev123")
-    operator_token = login("operator@example.com", "op123")
+    reviewer_token = login(client, "reviewer@example.com", "rev123")
+    operator_token = login(client, "operator@example.com", "op123")
 
     # 3) admin creates reasons
     r = client.post(

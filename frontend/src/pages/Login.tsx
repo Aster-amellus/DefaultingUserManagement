@@ -12,9 +12,17 @@ export default function Login() {
       const form = new URLSearchParams()
       form.set('username', values.email)
       form.set('password', values.password)
-  const { data } = await http.post('/auth/token', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
-      // 暂无角色查询接口，这里假设登录即为未知角色；后续可通过 /users/me 获得
+      const { data } = await http.post('/auth/token', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+      // set token first
       setAuth(data.access_token, 'Operator')
+      // then fetch real role from backend
+      try {
+        const me = await http.get('/users/me')
+        const role = (me.data.role as string)
+        if (role === 'admin' || role === 'Admin') setAuth(data.access_token, 'Admin')
+        else if (role === 'reviewer' || role === 'Reviewer') setAuth(data.access_token, 'Reviewer')
+        else setAuth(data.access_token, 'Operator')
+      } catch {}
       navigate('/customers')
     } catch (e: any) {
       message.error('登录失败')
