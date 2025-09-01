@@ -1,0 +1,61 @@
+[tool.poetry]
+name = "contract-platform"
+version = "0.1.0"
+description = "违约客户管理系统 后端服务 (FastAPI)"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+fastapi = "^0.115.0"
+uvicorn = {version = "^0.30.0", extras = ["standard"]}
+sqlalchemy = "^2.0.32"
+psycopg2-binary = "^2.9.9"
+alembic = "^1.13.2"
+python-jose = {version = "^3.3.0", extras = ["cryptography"]}
+passlib = {version = "^1.7.4", extras = ["bcrypt"]}
+python-multipart = "^0.0.9"
+pydantic = "^2.8.2"
+pydantic-settings = "^2.4.0"
+email-validator = "^2.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+httpx = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+# PEP 621 metadata for tools like `uv run`
+[project]
+name = "contract-platform"
+version = "0.1.0"
+description = "违约客户管理系统 后端服务 (FastAPI)"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+	"fastapi>=0.115.0,<1.0.0",
+	"uvicorn[standard]>=0.30.0,<1.0.0",
+	"sqlalchemy>=2.0.32,<3.0.0",
+	"psycopg2-binary>=2.9.9,<3.0.0",
+	"alembic>=1.13.2,<2.0.0",
+	"python-jose[cryptography]>=3.3.0,<4.0.0",
+	"passlib[bcrypt]>=1.7.4,<2.0.0",
+	"python-multipart>=0.0.9,<1.0.0",
+	"pydantic>=2.8.2,<3.0.0",
+	"pydantic-settings>=2.4.0,<3.0.0",
+	"email-validator>=2.2.0,<3.0.0",
+	"boto3>=1.35.36,<2.0.0",
+]
+
+
+
+[project.optional-dependencies]
+dev = [
+	"pytest>=8.3.2,<9.0.0",
+	"httpx>=0.27.0,<1.0.0",
+]

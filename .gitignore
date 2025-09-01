@@ -1,0 +1,70 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.so
+.venv/
+venv/
+env/
+ENV/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.pytype/
+.ruff_cache/
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Coverage / test artifacts
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+coverage.xml
+coverage/
+pytestdebug.log
+
+# --- Databases & local storage ---
+*.db
+*.sqlite
+dev.db
+test.db
+uploads/
+
+# --- Env & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+*.log
+*.log*
+logs/
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.orig
+
+# --- Node / Frontend (Vite/React) ---
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
+frontend/.vite/
+*.tsbuildinfo
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
