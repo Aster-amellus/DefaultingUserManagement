@@ -4,7 +4,7 @@ from typing import List
 from app.db.database import get_db
 from app.deps import require_role, get_current_user
 from app.models import User, RoleEnum
-from app.schemas import UserCreate, UserOut
+from app.schemas import UserCreate, UserUpdate, UserOut
 from app.security import get_password_hash
 
 
@@ -38,6 +38,11 @@ def list_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
 
+@router.get("/me", response_model=UserOut)
+def me(user: User = Depends(get_current_user)):
+    return user
+
+
 @router.get("/{user_id}", response_model=UserOut, dependencies=[Depends(require_role(RoleEnum.admin))])
 def get_user(user_id: int, db: Session = Depends(get_db)):
     u = db.get(User, user_id)
@@ -47,7 +52,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserOut, dependencies=[Depends(require_role(RoleEnum.admin))])
-def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)):
+def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)):
     u = db.get(User, user_id)
     if not u:
         raise HTTPException(status_code=404, detail="Not found")
@@ -73,6 +78,4 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
-    return user
+ 

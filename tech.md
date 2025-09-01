@@ -1,62 +1,52 @@
-违约客户管理系统 - 技术实现与选型文档 (v2.0)
-1. 具体实现目标
-1.1 数据库层
+违约客户管理系统 - 技术实现与选型文档 (v2.1)
 
-目标: 使用PostgreSQL设计并创建数据库表结构，以支持所有业务需求。
+总体架构
+- 单体三层：FastAPI + SQLAlchemy + React/Vite
+- 身份认证：JWT（OAuth2 Password），前端持久化令牌；RBAC（Admin/Reviewer/Operator）在依赖中强制
+- 运行方式：uv 本地开发；Docker/Compose 一键启停
 
-核心实体:
+后端（FastAPI）
+- 依赖与管理：uv + pyproject/requirements.txt
+- 关键模块
+	- app/main.py：应用入口、CORS、静态文件、审计中间件挂载
+	- app/security.py：JWT 签发与校验、密码哈希
+	- app/deps.py：鉴权依赖、角色校验
+	- app/routers/*.py：按域拆分路由（auth/users/customers/reasons/applications/notifications/stats/audit_logs）
+	- app/audit.py：统一审计写入；中间件按 HTTP 方法映射中文动作并记录 IP
+	- app/storage.py：本地/S3 后端，上传与预签名下载
+- 业务关键点
+	- 审批前附件要求：当 type=DEFAULT 且 decision=APPROVED，必须先上传附件
+	- 幂等创建：用户创建按 email 幂等更新，避免重复数据导致测试/种子冲突
+	- 搜索富信息：/applications/search、/applications/{id} 返回人名/原因描述等拓展字段
+	- 统计 detailed：支持 detailed=true 返回占比与近12个月趋势
+	- 审计中文化：action 转中文（登录/新增/审核/上传附件等），输出 actor、resource、ip
 
-新增: users, roles, audit_logs 表用于支持权限和审计功能。
+数据库与迁移
+- ORM：SQLAlchemy；迁移：Alembic
+- 主要表：users、customers、reasons、applications、application_attachments、audit_logs、notifications
+- 迁移脚本：alembic/versions/*（含为审计增加 IP 字段的迁移）
 
-customers: 客户主表，包含行业、区域等信息，并有一个核心的is_default状态字段。
+配置与种子
+- .env（示例见 .env.example）
+	- DATABASE_URL、JWT_SECRET_KEY/ALGORITHM/EXPIRE
+	- 初始账号：ADMIN/REVIEWER/OPERATOR 默认邮箱/密码（启动后自动创建，不重复创建）
+	- STORAGE_BACKEND=local|s3 及对应 S3_ENDPOINT / S3_BUCKET / AWS_* / S3_REGION
+- 初始原因：默认写入一组违约/重生原因，可在前端“原因”页调整
 
-reasons: 统一管理违约和重生原因的配置表。
+对象存储
+- local：保存到 uploads/ 并通过 /files 路由提供静态访问
+- s3/minio：boto3 客户端，保存至桶内；下载通过预签名 URL
 
-applications: 记录所有违约和重生申请的核心流水表。
+前端（React + Vite + Ant Design）
+- 路由与权限：React Router + 角色菜单过滤（Admin 多“用户”菜单）
+- 数据：React Query + Axios，统一带上 Authorization
+- 状态：Zustand 轻量存储用户/令牌
+- 关键页面：登录、客户、原因、申请、统计、审计（Admin）、用户（Admin）
 
-application_attachments: 存储申请相关的附件信息。
+测试与质量
+- 后端：pytest；测试前重置测试库，避免重复数据冲突
+- 前端：Vite 构建校验；可扩展 Playwright 端到端测试
 
-1.2 后端服务层
-
-目标: 使用Python开发一套遵循RESTful风格的API服务。
-
-任务:
-
-实现所有业务功能的接口。
-
-新增: 实现基于JWT (JSON Web Tokens) 的用户认证和基于角色的授权机制。FastAPI的依赖注入系统非常适合实现此功能。
-
-确保API的性能和安全性。
-
-1.3 核心业务逻辑实现
-
-目标: 在后端服务中精确实现核心业务规则。
-
-关键点:
-
-状态机: 实现applications表的状态流转逻辑（PENDING -> APPROVED / REJECTED）。
-
-数据同步: 在审核通过时，通过事务确保applications状态和customers的is_default状态同步更新。
-
-统计查询: 编写高效的SQL聚合查询。
-
-新增 - 审计日志: 使用中间件 (Middleware) 或装饰器 (Decorator) 自动为标记为关键操作的API端点创建审计日志。
-
-2. 技术选型 (无变化)
-遵循“务实、高效、稳定”的原则，技术选型保持不变：
-
-整体架构: 单体三层架构 (Monolithic Three-Tier Architecture)
-
-数据库: PostgreSQL
-
-后端技术栈:
-
-语言: Python 3.9+
-
-包管理器： uv
-
-Web框架: FastAPI
-
-ORM: SQLAlchemy
-
-部署方案: Docker + Docker Compose
+部署与运行
+- 本地：uv run fastapi/pytest；frontend 使用 Vite dev server
+- Docker：docker-compose up -d 同启前后端与数据库（如配置）

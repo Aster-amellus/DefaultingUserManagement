@@ -5,33 +5,43 @@ type Role = 'Admin' | 'Reviewer' | 'Operator'
 interface AuthState {
   token: string | null
   role: Role | null
-  setAuth: (token: string, role: Role) => void
+  userId: number | null
+  setAuth: (token: string | null, role: Role | null) => void
+  setUser: (userId: number | null) => void
   clear: () => void
 }
 
 const STORAGE_KEY = 'auth_state'
 
-function loadInitial(): Pick<AuthState, 'token' | 'role'> {
+function loadInitial(): Pick<AuthState, 'token' | 'role' | 'userId'> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { token: null, role: null }
+    if (!raw) return { token: null, role: null, userId: null }
     const parsed = JSON.parse(raw)
-    return { token: parsed.token ?? null, role: parsed.role ?? null }
-  } catch { return { token: null, role: null } }
+    return { token: parsed.token ?? null, role: parsed.role ?? null, userId: parsed.userId ?? null }
+  } catch { return { token: null, role: null, userId: null } }
 }
 
-export const useAuthStore = create<AuthState>((set) => {
+export const useAuthStore = create<AuthState>((set, get) => {
   const init = loadInitial()
   return {
     token: init.token,
     role: init.role,
+    userId: init.userId,
     setAuth: (token, role) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, role }))
+      const current = get()
+      const userId = current.userId
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, role, userId }))
       set({ token, role })
+    },
+    setUser: (userId) => {
+      const current = get()
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: current.token, role: current.role, userId }))
+      set({ userId })
     },
     clear: () => {
       localStorage.removeItem(STORAGE_KEY)
-      set({ token: null, role: null })
+      set({ token: null, role: null, userId: null })
     }
   }
 })

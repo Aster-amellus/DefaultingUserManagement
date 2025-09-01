@@ -9,7 +9,7 @@ const { Header, Sider, Content } = Layout
 
 export default function App() {
   const navigate = useNavigate()
-  const { token, role, clear } = useAuthStore()
+  const { token, role, clear, userId } = useAuthStore()
   const isAuthed = !!token
   const visibleRoutes: AppRoute[] = useMemo(() => routesForRole(role), [role])
 
@@ -18,19 +18,20 @@ export default function App() {
   }, [isAuthed])
 
   useEffect(() => {
-    // on load, if token exists but role is null, fetch /users/me
-    async function syncRole() {
-      if (!token || role) return
+    // on load, if token exists but role or userId is missing, fetch /users/me
+    async function syncMe() {
+      if (!token || (role && userId)) return
       try {
         const me = await http.get('/users/me')
         const r = (me.data.role as string)
+        useAuthStore.getState().setUser(me.data.id)
         if (r?.toLowerCase() === 'admin') useAuthStore.getState().setAuth(token, 'Admin')
         else if (r?.toLowerCase() === 'reviewer') useAuthStore.getState().setAuth(token, 'Reviewer')
         else useAuthStore.getState().setAuth(token, 'Operator')
       } catch {}
     }
-    syncRole()
-  }, [token, role])
+    syncMe()
+  }, [token, role, userId])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

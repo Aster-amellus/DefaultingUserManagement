@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 export default function Login() {
   const navigate = useNavigate()
   const setAuth = useAuthStore(s => s.setAuth)
+  const setUser = useAuthStore(s => s.setUser)
 
   const onFinish = async (values: any) => {
     try {
@@ -14,16 +15,16 @@ export default function Login() {
       form.set('password', values.password)
       const { data } = await http.post('/auth/token', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
       // set token first
-      setAuth(data.access_token, 'Operator')
-      // then fetch real role from backend
+      setAuth(data.access_token, null as any)
       try {
         const me = await http.get('/users/me')
-        const role = (me.data.role as string)
-        if (role === 'admin' || role === 'Admin') setAuth(data.access_token, 'Admin')
-        else if (role === 'reviewer' || role === 'Reviewer') setAuth(data.access_token, 'Reviewer')
+        setUser(me.data.id)
+        const r = (me.data.role as string)
+        if (r?.toLowerCase() === 'admin') setAuth(data.access_token, 'Admin')
+        else if (r?.toLowerCase() === 'reviewer') setAuth(data.access_token, 'Reviewer')
         else setAuth(data.access_token, 'Operator')
       } catch {}
-      navigate('/customers')
+      navigate('/applications')
     } catch (e: any) {
       message.error('登录失败')
     }

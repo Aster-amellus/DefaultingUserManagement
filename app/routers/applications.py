@@ -14,7 +14,7 @@ from app.models import (
     RoleEnum,
     Notification,
 )
-from app.schemas import ApplicationCreate, ApplicationOut, ReviewAction, ApplicationAttachmentOut, ApplicationDetailOut
+from app.schemas import ApplicationCreate, ApplicationOut, ReviewAction, ApplicationAttachmentOut, ApplicationDetailOut, ApplicationUpdate
 from app.audit import write_audit
 from app.storage import Storage
 
@@ -29,6 +29,11 @@ def _validate_business_rules(db: Session, payload: ApplicationCreate):
     reason = db.get(Reason, payload.reason_id)
     if not reason or not reason.enabled:
         raise HTTPException(status_code=400, detail="Invalid reason")
+    # reason type must match application type
+    if payload.type == ApplicationType.default.value and reason.type != ApplicationType.default.value:
+        raise HTTPException(status_code=400, detail="Reason type mismatch for DEFAULT")
+    if payload.type == ApplicationType.rebirth.value and reason.type != ApplicationType.rebirth.value:
+        raise HTTPException(status_code=400, detail="Reason type mismatch for REBIRTH")
     if payload.type == ApplicationType.default.value:
         if customer.is_default:
             raise HTTPException(status_code=400, detail="Customer already default")
@@ -78,6 +83,9 @@ def list_applications(
         q = q.join(Customer).filter(Customer.name.ilike(f"%{customer_name}%"))
     if status:
         q = q.filter(Application.status == status)
+    # Operators only see their own applications; reviewers/admin see all
+    if getattr(user, "role", None) == RoleEnum.operator.value:
+        q = q.filter(Application.created_by == user.id)
     return q.order_by(Application.created_at.desc()).all()
 
 
@@ -96,6 +104,8 @@ def search_applications(
         q = q.filter(Application.status == status)
     if type:
         q = q.filter(Application.type == type)
+    if getattr(user, "role", None) == RoleEnum.operator.value:
+        q = q.filter(Application.created_by == user.id)
     apps = q.order_by(Application.created_at.desc()).all()
     from app.models import User  # local import to avoid circular deps
     out: List[ApplicationDetailOut] = []
@@ -130,6 +140,9 @@ def get_application_detail(app_id: int, db: Session = Depends(get_db), user=Depe
     app = db.get(Application, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Not found")
+    # Operators can only view their own applications
+    if getattr(user, "role", None) == RoleEnum.operator.value and app.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     customer = db.get(Customer, app.customer_id)
     reason = db.get(Reason, app.reason_id)
     # safer: query user names inline to avoid circular import
@@ -156,11 +169,54 @@ def get_application_detail(app_id: int, db: Session = Depends(get_db), user=Depe
     )
 
 
+@router.patch("/{app_id}", response_model=ApplicationOut, dependencies=[Depends(require_role(RoleEnum.admin))])
+def admin_update_application(app_id: int, payload: ApplicationUpdate, db: Session = Depends(get_db)):
+    app = db.get(Application, app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Not found")
+    # prevent status/review fields change here; focus on form fields
+    data = payload.model_dump(exclude_none=True)
+    # If changing type/reason/customer, re-run validations using a temp payload
+    if any(k in data for k in ("type", "reason_id", "customer_id")):
+        temp = ApplicationCreate(
+            type=data.get("type", app.type),
+            customer_id=data.get("customer_id", app.customer_id),
+            latest_external_rating=data.get("latest_external_rating", app.latest_external_rating),
+            reason_id=data.get("reason_id", app.reason_id),
+            severity=data.get("severity", app.severity),
+            remark=data.get("remark", app.remark),
+        )
+        _validate_business_rules(db, temp)
+    for k, v in data.items():
+        setattr(app, k, v)
+    db.add(app)
+    write_audit(db, None, "ADMIN_UPDATE", "Application", str(app.id), None)
+    db.commit()
+    db.refresh(app)
+    return app
+
+
+@router.delete("/{app_id}", dependencies=[Depends(require_role(RoleEnum.admin))])
+def admin_delete_application(app_id: int, db: Session = Depends(get_db)):
+    app = db.get(Application, app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(app)
+    write_audit(db, None, "ADMIN_DELETE", "Application", str(app_id), None)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/{app_id}/attachments")
 def upload_attachment(app_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), user=Depends(get_current_user)):
     app = db.get(Application, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
+    # Only creator or admin can upload, and only while pending
+    if app.status != ApplicationStatus.pending.value:
+        raise HTTPException(status_code=400, detail="Attachments not allowed after review")
+    if user.role != RoleEnum.admin.value and app.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     content = file.file.read()
     key = f"applications/{app_id}/{file.filename}"
     storage = Storage()
@@ -177,12 +233,19 @@ def list_attachments(app_id: int, db: Session = Depends(get_db), user=Depends(ge
     app = db.get(Application, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
+    if getattr(user, "role", None) == RoleEnum.operator.value and app.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     return db.query(ApplicationAttachment).filter(ApplicationAttachment.application_id == app_id).order_by(ApplicationAttachment.uploaded_at.desc()).all()
 
 
 @router.get("/{app_id}/attachments/presign")
 def get_presigned_attachment(app_id: int, filename: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
     # return a presigned url (only for s3 backend); for local storage, return direct path
+    app = db.get(Application, app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if getattr(user, "role", None) == RoleEnum.operator.value and app.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     key = f"applications/{app_id}/{filename}"
     storage = Storage()
     url = storage.get_presigned_url(key)
@@ -202,11 +265,7 @@ def review_application(app_id: int, payload: ReviewAction, db: Session = Depends
     if payload.decision not in (ApplicationStatus.approved.value, ApplicationStatus.rejected.value):
         raise HTTPException(status_code=400, detail="Invalid decision")
 
-    # Enforce attachments for DEFAULT approvals per spec
-    if payload.decision == ApplicationStatus.approved.value and app.type == ApplicationType.default.value:
-        has_att = db.query(ApplicationAttachment).filter(ApplicationAttachment.application_id == app_id).first() is not None
-        if not has_att:
-            raise HTTPException(status_code=400, detail="Attachment required for DEFAULT approval")
+    # Attachments optional: reviewers can approve without attachments
 
     # Transition and side effects in one transaction
     app.status = payload.decision

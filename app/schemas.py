@@ -15,6 +15,12 @@ class UserCreate(BaseModel):
     role: Optional[str] = None
 
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+
+
 class UserOut(BaseModel):
     id: int
     email: EmailStr
@@ -33,6 +39,7 @@ class CustomerCreate(BaseModel):
 
 
 class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
     industry: Optional[str] = None
     region: Optional[str] = None
     is_default: Optional[bool] = None
@@ -96,6 +103,15 @@ class ApplicationOut(BaseModel):
 
 class ReviewAction(BaseModel):
     decision: str  # APPROVED or REJECTED
+    remark: Optional[str] = None
+
+
+class ApplicationUpdate(BaseModel):
+    type: Optional[str] = None
+    customer_id: Optional[int] = None
+    latest_external_rating: Optional[str] = None
+    reason_id: Optional[int] = None
+    severity: Optional[str] = None
     remark: Optional[str] = None
 
 

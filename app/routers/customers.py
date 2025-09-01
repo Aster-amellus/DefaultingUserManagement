@@ -43,11 +43,20 @@ def get_customer(customer_id: int, db: Session = Depends(get_db), user=Depends(g
 
 
 @router.patch("/{customer_id}", response_model=CustomerOut, dependencies=[Depends(require_role(RoleEnum.admin, RoleEnum.operator))])
-def update_customer(customer_id: int, payload: CustomerUpdate, db: Session = Depends(get_db)):
+def update_customer(customer_id: int, payload: CustomerUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     c = db.get(Customer, customer_id)
     if not c:
         raise HTTPException(status_code=404, detail="Not found")
-    for k, v in payload.model_dump(exclude_none=True).items():
+    data = payload.model_dump(exclude_none=True)
+    # Only Admin can rename customer name to avoid collisions
+    if "name" in data and user.role != RoleEnum.admin.value:
+        del data["name"]
+    # if renaming, ensure uniqueness
+    if "name" in data:
+        exists = db.query(Customer).filter(Customer.name == data["name"], Customer.id != customer_id).first()
+        if exists:
+            raise HTTPException(status_code=400, detail="Customer name already exists")
+    for k, v in data.items():
         setattr(c, k, v)
     db.add(c)
     db.commit()

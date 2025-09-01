@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, case
+from sqlalchemy import func, case, text
 from sqlalchemy.orm import Session
 from typing import List, Dict, Tuple
 from app.db.database import get_db
@@ -14,11 +14,17 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 def _monthly_trends(db: Session, group_col, year: int) -> Tuple[Dict[str, List[int]], Dict[str, List[int]]]:
     start = datetime(year, 1, 1)
     end = datetime(year + 1, 1, 1)
-    # Defaults per month
+    # DB-agnostic month extraction
+    dialect = db.bind.dialect.name if db.bind is not None else "sqlite"
+    if dialect == "sqlite":
+        month_expr = func.strftime("%m", Application.reviewed_at)
+    else:
+        # assumes postgres
+        month_expr = func.to_char(Application.reviewed_at, text("'MM'"))
     rows = (
         db.query(
             group_col.label("g"),
-            func.strftime("%m", Application.reviewed_at).label("m"),
+            month_expr.label("m"),
             func.sum(case((Application.type == ApplicationType.default.value, 1), else_=0)).label("cnt_d"),
             func.sum(case((Application.type == ApplicationType.rebirth.value, 1), else_=0)).label("cnt_r"),
         )

@@ -1,94 +1,86 @@
-违约客户管理系统 - 需求分析文档 (v2.0)
-1. 项目概述
-本项目旨在开发一个内部使用的“违约客户管理系统”。该系统的核心目标是为风险控制等相关业务部门提供一套标准化、流程化的线上工具，用于人工发起、审核、查询和管理客户的违约与重生状态。此外，系统还需提供宏观的统计分析功能，以支持业务决策。
+违约客户管理系统 - API 文档（v2.1）
 
-2. 系统参与者 (Actors)
-业务人员 (Operator): 系统的主要使用者，负责发起客户的违约认定和违约重生申请。
+说明：本文件列出后端 REST API 的路径、参数、权限与关键业务约束，覆盖认证、用户、客户、原因、申请、附件、统计与审计模块。
 
-审核人员 (Reviewer): 负责审核由业务人员提交的各类申请，并做出“同意”或“拒绝”的决策。
+身份与权限
+- 认证：OAuth2 Password（JWT）。登录成功后在请求头携带 Authorization: Bearer <token>
+- 角色：Admin、Reviewer、Operator。标注“(Admin)”表示仅管理员可用；“(Reviewer|Admin)”表示审核角色和管理员均可调用；未注明则三种角色均可用（登录后）。
 
-系统管理员 (Admin): 负责维护系统的基础配置数据和用户权限。
+认证与当前用户
+- POST /auth/token
+	- form: username, password
+	- 响应：{ access_token, token_type }
+- GET /users/me
+	- 响应：当前登录用户信息
 
-3. 功能性需求 (Functional Requirements)
-3.1 基础配置模块
+用户管理（Admin）
+- POST /users/
+	- body: { email, password, full_name?, role? }
+	- 幂等：若 email 存在则更新姓名/密码/角色
+- GET /users/
+- GET /users/{id}
+- PATCH /users/{id}
+	- body: { full_name?, password?, role? }
+- DELETE /users/{id}
 
-FR1.1 违约原因维护: 管理员可以对违约原因进行增、删、改、查操作。每个原因包含：原因描述、是否启用状态、排序序号。
+客户（Customers）
+- POST /customers/
+- GET /customers/
+- GET /customers/{id}
+- PATCH /customers/{id}
+- DELETE /customers/{id}
 
-FR1.2 重生原因维护: 管理员可以对重生原因进行增、删、改、查操作。
+原因（Reasons）
+- GET /reasons/
+	- query: type=DEFAULT|REBIRTH（可选，过滤类型）
+- POST /reasons/ (Admin)
+- PATCH /reasons/{id} (Admin)
+- DELETE /reasons/{id} (Admin)
 
-3.2 客户主数据模块
+申请（Applications）
+- POST /applications/
+	- body: { type: DEFAULT|REBIRTH, customer_id, latest_external_rating?, reason_id, severity: HIGH|MEDIUM|LOW, remark? }
+	- 规则校验：
+		- 客户已违约时禁止发起 DEFAULT；客户非违约时禁止发起 REBIRTH
+		- reason 必须启用
+- GET /applications/
+	- query: customer_name?, status?
+- GET /applications/search
+	- query: customer_name?, status?, type?
+	- 响应：富信息（含 customer_name、reason_description、创建/审核人姓名等）
+- GET /applications/{id}
+	- 响应：同上（富信息）
+- POST /applications/{id}/review (Reviewer|Admin)
+	- body: { decision: APPROVED|REJECTED }
+	- 规则：当 type=DEFAULT 且 decision=APPROVED 时，必须先上传至少一个附件，否则 400: "Attachment required for DEFAULT approval"
+	- 通过后自动联动 customers.is_default（DEFAULT->True / REBIRTH->False）并向申请人发通知
 
-FR2.1 客户信息维护: 管理员或业务人员可以对客户的基础信息（名称、行业、区域等）进行增、删、改、查操作。
+附件（Attachments）
+- POST /applications/{id}/attachments
+	- form: file（单文件）
+- GET /applications/{id}/attachments
+- GET /applications/{id}/attachments/presign
+	- query: filename
+	- 响应：{ url }（S3 场景返回预签名 URL；本地返回可直接访问的 /files/... 路径）
 
-3.3 违约认定工作流
+统计（Stats）
+- GET /stats/industry
+	- query: year?、detailed?=true|false（默认 false）
+	- detailed=true 时：额外返回各类占比、近12个月趋势数组
+- GET /stats/region
+	- 同上
 
-FR3.1 违约认定申请:
+审计日志（Audit Logs, Admin）
+- GET /audit-logs/
+	- query: user_id?, action?, target_type?, start?, end?, limit?（默认100）
+	- 响应：{ items: [ { id, timestamp, actor, action, resource, ip } ] }
+	- 说明：action 为中文标签（如 登录/新增/审核/上传附件等），resource 形如 "Application:123" 或 "HTTP:/path"
 
-业务人员可对非违约状态的客户发起违约认定申请。
+错误码约定
+- 400 业务规则不满足（如重复发起、原因禁用、审批缺少附件、状态非待审等）
+- 401 未认证或令牌失效
+- 403 无权限访问
+- 404 资源不存在
 
-申请表单需包含：客户名称、最新外部等级、违约原因、违约严重性（高、中、低）、备注信息。
-
-支持上传附件。
-
-系统需校验：已是违约客户的禁止重复发起。客户名称和违约原因为必填项。
-
-FR3.2 违约认定审核:
-
-审核人员可以查询状态为“待审核”的违约认定申请。
-
-审核人员可以对申请执行“同意”或“拒绝”操作。
-
-审核通过后，该客户的状态应自动更新为“违约”。
-
-3.4 违约重生工作流
-
-FR4.1 违约重生申请:
-
-业务人员可对违约状态的客户发起重生申请。
-
-发起时需选择一个已配置的“重生原因”。
-
-FR4.2 违约重生审核:
-
-审核人员可以查询状态为“待审核”的违约重生申请。
-
-审核人员可以对申请执行“同意”或“拒绝”操作。
-
-审核通过后，该客户的状态应自动更新为“非违约”。
-
-3.5 数据查询与统计模块
-
-FR5.1 统一信息查询: 提供统一界面，按“客户名称”、“审核状态”等条件筛选所有历史申请记录。
-
-FR5.2 按行业统计: 以图表形式展示指定年份内，各行业的违约/重生客户数量、占比。
-
-FR5.3 按区域统计: 以图表形式展示指定年份内，各区域的违约/重生客户数量、占比。
-
-4. 补充业务规则与非功能性需求
-4.1 用户与权限 (User & Permissions)
-
-规则: 系统采用基于角色的访问控制（RBAC）。
-
-Admin: 拥有所有权限，包括用户管理和基础配置。
-
-Reviewer: 拥有审核权限及所有查询权限。
-
-Operator: 拥有申请发起权限及所有查询权限。
-
-数据可见性: 为保证透明度，所有申请记录对所有角色可见，但操作权限受角色限制。
-
-4.2 客户主数据 (Customer Master Data)
-
-规则: 为保证系统独立性，客户主数据（名称、行业、区域）在本系统内进行维护。后续版本可考虑与外部CRM系统集成。
-
-4.3 通知机制 (Notifications)
-
-规则: 采用系统内通知机制。当一份申请被审核后，系统应自动向申请发起人发送一条站内通知。暂不考虑邮件等外部通知方式。
-
-4.4 审计日志 (Audit Log)
-
-规则: 系统必须记录所有关键操作的审计日志。
-
-记录范围: 包括但不限于用户登录、配置修改、申请提交、审核操作。
-
-日志内容: 需记录操作人、操作时间、操作类型、操作对象的关键信息。
+版本与兼容
+- 当前版本 v2.1，与前端 1.x 兼容。后续增加字段时遵循向后兼容策略，新增只读字段不破坏现有客户端。

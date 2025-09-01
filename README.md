@@ -1,6 +1,6 @@
 # 违约客户管理系统（全栈）
 
-基于 FastAPI（后端）+ React/Vite（前端）。实现 JWT 登录、RBAC 角色权限（Admin/Reviewer/Operator）、违约/重生工作流、对象存储附件、统计与审计日志。
+基于 FastAPI（后端）+ React/Vite（前端）。实现 JWT 登录、RBAC 权限（Admin/Reviewer/Operator）、违约/重生工作流、对象存储附件、统计（行业/区域/趋势/占比）与中文审计日志（含操作者/资源/IP）。
 
 ## 一键启动（Docker Compose）
 
@@ -15,6 +15,7 @@ docker compose up -d --build
 	- Admin: admin@example.com / admin123
 	- Reviewer: reviewer@example.com / reviewer123
 	- Operator: operator@example.com / operator123
+ - 初始原因（种子）：按“违约/重生”两类写入一组常用原因，便于开箱即用（可在“原因”页调整启用/排序）。
 
 ## 本地开发
 
@@ -39,6 +40,7 @@ uv run uvicorn app.main:app --reload --port 8000
 - DATABASE_URL：数据库连接串（例：postgresql+psycopg2://user:pass@host:5432/db 或 sqlite+pysqlite:///./dev.db）
 - JWT_SECRET_KEY、JWT_ALGORITHM、ACCESS_TOKEN_EXPIRE_MINUTES
 - ADMIN_DEFAULT_EMAIL、ADMIN_DEFAULT_PASSWORD（首次登录前会自动创建管理员）
+ - REVIEWER_DEFAULT_EMAIL/REVIEWER_DEFAULT_PASSWORD、OPERATOR_DEFAULT_EMAIL/OPERATOR_DEFAULT_PASSWORD（首次登录时自动创建）
 - STORAGE_BACKEND=local|s3；如为 s3，还需 S3_ENDPOINT、S3_BUCKET、AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY、S3_REGION
 
 ### 前端（Vite）
@@ -50,7 +52,7 @@ npm run dev
 ```
 
 - 访问 http://localhost:5173
-- `/api` 将通过 Vite 代理到后端（默认 http://localhost:8000）。若后端地址不同，可设置 `VITE_API_BASE`。
+- `/api` 通过 Vite 代理到后端（默认 http://localhost:8000）。如后端地址不同，设置 `VITE_API_BASE` 或编辑 `vite.config.ts`。
 - 生产构建/预览：
 
 ```bash
@@ -75,7 +77,7 @@ npm run preview
 - 系统管理员（Admin）
 	- 核心：用户与权限管理、原因维护、系统配置
 	- 辅助：拥有系统全部权限
-	- 可见菜单：客户、申请、原因、统计、审计（等）
+	- 可见菜单：客户、申请、原因、统计、审计、用户
 
 前端登录后会调用 `/users/me` 自动识别角色并限制可见菜单和路由；后端通过 `require_role` 做接口鉴权（如 `/audit-logs/` 仅 Admin）。
 
@@ -84,14 +86,37 @@ npm run preview
 - 客户主数据：新增/查询
 - 原因维护：违约/重生原因的增删改、启用/禁用（Admin）
 - 申请流程：发起/附件上传/审批（通过/拒绝），通过后联动 `customers.is_default`
+- 业务规则：
+	- 已是违约客户禁止再次发起违约认定；非违约客户禁止发起重生。
+	- 审批“违约认定”通过前，须至少上传1个附件。
 - 统计分析：按行业/区域
+- 统计增强：支持 detailed=true 返回各项占比与12个月趋势数组。
 - 通知提醒：审批后自动通知
-- 审计日志：中间件记录关键操作；提供筛选查询（Admin）
+- 审计日志（中文）：记录操作者、动作（中文）、资源、IP、时间；提供筛选查询（Admin）
 - 对象存储：本地或 S3/MinIO，预签名下载/预览
+
+## 管理用户（Admin）
+- 页面：侧边栏“用户”（Admin专属），支持创建/列表/编辑（姓名、密码、角色）/删除。
+- API：
+	- POST /users/（创建或幂等更新）
+	- GET /users/、GET /users/{id}
+	- PATCH /users/{id}、DELETE /users/{id}
+
+## 查询/审批页面
+- 申请：支持按客户名/状态/类型查询（后端提供 `/applications/search` 返回富信息字段）。
+- 附件：每条申请可上传，审批违约需先上传。
+- 审计：仅 Admin，可筛选动作/时间区间，输出包含操作者姓名/邮箱、动作（中文）、资源与IP。
 
 ## API 文档
 - 访问 http://localhost:8000/docs（Swagger）
-- 常用：`/auth/token` 登录、`/users/me` 当前用户、`/applications/*` 工作流、`/reasons/*` 原因、`/customers/*` 客户、`/stats/*` 统计、`/audit-logs/` 审计
+- 常用：
+	- 认证：`/auth/token` 登录、`/users/me` 当前用户
+	- 用户：`/users/*`（Admin）
+	- 客户：`/customers/*`
+	- 原因：`/reasons/*`（支持 `?type=DEFAULT|REBIRTH`）
+	- 申请：`/applications/*`、`/applications/search`、`/applications/{id}/attachments`
+	- 统计：`/stats/industry|region`（可带 `detailed=true`）
+	- 审计：`/audit-logs/`（Admin）
 
 ## 目录结构（摘）
 - app/main.py：FastAPI 入口、路由注册、CORS、审计中间件
@@ -105,3 +130,4 @@ npm run preview
 - 首次登录 401：确认已使用 `.env` 中的管理员邮箱/密码调用 `/auth/token` 获取 JWT，并在前端完成登录；前端会自动附带 Authorization 头。
 - 审计页无权限：`/audit-logs/` 仅 Admin 可访问，使用管理员账号登录；非 Admin 将提示“无权限查看审计日志”。
 - 代理问题：后端不在默认 8000 端口时，设置 `VITE_API_BASE` 或修改 `frontend/vite.config.ts` 代理目标。
+ - 违约审批失败“需要附件”：请先在该申请条目点击“上传附件”，再由 Reviewer/ Admin 审批“同意”。
