@@ -39,33 +39,16 @@ docker compose down
 
 ### 后端（uv + Alembic）
 
-```bash
-# 1) 创建虚拟环境并安装依赖
-uv venv
-uv pip install -r requirements.txt
-
 # 2) 配置环境变量（复制 .env.example 为 .env 并按需修改）
-cp -n .env.example .env || true
-
-# 3) 初始化数据库（Alembic 迁移）
-uv run alembic upgrade head
-
 # 4) 启动后端（FastAPI/Uvicorn）
 uv run uvicorn app.main:app --reload --port 8000
-```
-
 ## 生产部署（Windows/Linux 通用，Docker）
 
 使用 production 方案，前端打包为静态文件由 Nginx 提供，后端为 Uvicorn（不启用 reload），跨平台一致。
 
 ```bash
-# 构建生产镜像
-docker compose -f docker-compose.prod.yml build
-
 # 启动
 docker compose -f docker-compose.prod.yml up -d
-
-# 查看
 # 前端: http://localhost
 # API:  http://localhost:8000 (Swagger: /docs)
 
@@ -75,19 +58,10 @@ docker compose -f docker-compose.prod.yml down
 
 注意：
 - 如需自定义环境变量，复制 `.env.example` 为 `.env` 并按需修改，再通过 compose 的 environment 注入或扩展 `docker-compose.prod.yml`。
-- Windows 与 Linux 使用同样命令即可（需安装 Docker Desktop / Docker Engine）。
-- 生产环境建议在 API 前增加反向代理（Nginx/Traefik）和 HTTPS 证书（Let’s Encrypt）。
-
-常用环境变量（.env）：
-- DATABASE_URL：数据库连接串（例：postgresql+psycopg2://user:pass@host:5432/db 或 sqlite+pysqlite:///./dev.db）
-- JWT_SECRET_KEY、JWT_ALGORITHM、ACCESS_TOKEN_EXPIRE_MINUTES
 - ADMIN_DEFAULT_EMAIL、ADMIN_DEFAULT_PASSWORD（首次登录前会自动创建管理员）
  - REVIEWER_DEFAULT_EMAIL/REVIEWER_DEFAULT_PASSWORD、OPERATOR_DEFAULT_EMAIL/OPERATOR_DEFAULT_PASSWORD（首次登录时自动创建）
-- STORAGE_BACKEND=local|s3；如为 s3，还需 S3_ENDPOINT、S3_BUCKET、AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY、S3_REGION
 
-### 前端（Vite）
-
-```bash
+ docs/02_进度计划表.md, docs/03_沟通讨论记录.md, docs/04_项目需求.md, docs/TEST_REPORT.md, docs/06_答辩PPT.md, docs/07_技术文档.md.
 cd frontend
 npm install
 npm run dev

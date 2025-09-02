@@ -1,7 +1,7 @@
 PY=python3
 UV=uv
 
-.PHONY: venv install dev run test fmt seed-demo clean deep-clean docker-clean docker-up docker-up-prod docker-down docker-build-prod
+.PHONY: venv install dev run test fmt seed-demo clean deep-clean docker-clean docker-up docker-up-prod docker-down docker-build-prod package-release
 
 venv:
 	$(UV) venv .venv
@@ -56,3 +56,8 @@ docker-build-prod:
 
 docker-up-prod:
 	docker compose -f docker-compose.prod.yml up -d --build
+
+# Package release artifacts (frontend dist + docs)
+package-release:
+	cd frontend && npm ci && npm run build
+	bash scripts/package_release.sh
