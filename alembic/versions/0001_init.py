@@ -15,7 +15,7 @@ def upgrade():
         sa.Column('email', sa.String(length=255), nullable=False, unique=True),
         sa.Column('full_name', sa.String(length=255)),
         sa.Column('hashed_password', sa.String(length=255), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('TRUE')),
         sa.Column('role', sa.String(length=32), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
     )
@@ -26,7 +26,7 @@ def upgrade():
         sa.Column('name', sa.String(length=255), nullable=False, unique=True),
         sa.Column('industry', sa.String(length=100)),
         sa.Column('region', sa.String(length=100)),
-        sa.Column('is_default', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+    sa.Column('is_default', sa.Boolean(), nullable=False, server_default=sa.text('FALSE')),
         sa.Column('created_at', sa.DateTime(), nullable=False),
     )
 
@@ -35,7 +35,7 @@ def upgrade():
         sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('type', sa.String(length=20), nullable=False),
         sa.Column('description', sa.String(length=255), nullable=False),
-        sa.Column('enabled', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+    sa.Column('enabled', sa.Boolean(), nullable=False, server_default=sa.text('TRUE')),
         sa.Column('sort_order', sa.Integer(), nullable=False, server_default='0'),
     )
 
@@ -80,7 +80,7 @@ def upgrade():
         sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('content', sa.String(length=512), nullable=False),
-        sa.Column('is_read', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+    sa.Column('is_read', sa.Boolean(), nullable=False, server_default=sa.text('FALSE')),
         sa.Column('created_at', sa.DateTime(), nullable=False),
     )
 

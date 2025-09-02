@@ -52,8 +52,8 @@
 	- 响应：同上（富信息）
 - POST /applications/{id}/review (Reviewer|Admin)
 	- body: { decision: APPROVED|REJECTED }
-	- 规则：当 type=DEFAULT 且 decision=APPROVED 时，必须先上传至少一个附件，否则 400: "Attachment required for DEFAULT approval"
 	- 通过后自动联动 customers.is_default（DEFAULT->True / REBIRTH->False）并向申请人发通知
+	- 附件非强制；可在申请待审阶段由创建人或管理员上传
 
 附件（Attachments）
 - POST /applications/{id}/attachments
@@ -83,4 +83,11 @@
 - 404 资源不存在
 
 版本与兼容
+管理员扩展接口
+- PATCH /applications/{id} (Admin)
+	- body（可选字段）：{ type, customer_id, latest_external_rating, reason_id, severity, remark }
+	- 校验：类型与原因匹配；DEFAULT 仅针对非违约客户；REBIRTH 仅针对违约客户
+- DELETE /applications/{id} (Admin)
+- PATCH /customers/{id}
+	- 客户重命名仅 Admin；重名将返回 400
 - 当前版本 v2.1，与前端 1.x 兼容。后续增加字段时遵循向后兼容策略，新增只读字段不破坏现有客户端。

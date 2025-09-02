@@ -17,6 +17,24 @@ docker compose up -d --build
 	- Operator: operator@example.com / operator123
  - 初始原因（种子）：按“违约/重生”两类写入一组常用原因，便于开箱即用（可在“原因”页调整启用/排序）。
 
+### 维护与常用命令
+
+```bash
+# 查看日志
+docker compose logs -f api
+docker compose logs -f frontend
+
+# 重建并重启
+docker compose up -d --build
+
+# 进入 API 容器执行迁移/脚本
+docker compose exec api alembic upgrade head
+docker compose exec api uv run python scripts/seed_demo_data.py
+
+# 停止
+docker compose down
+```
+
 ## 本地开发
 
 ### 后端（uv + Alembic）
@@ -35,6 +53,30 @@ uv run alembic upgrade head
 # 4) 启动后端（FastAPI/Uvicorn）
 uv run uvicorn app.main:app --reload --port 8000
 ```
+
+## 生产部署（Windows/Linux 通用，Docker）
+
+使用 production 方案，前端打包为静态文件由 Nginx 提供，后端为 Uvicorn（不启用 reload），跨平台一致。
+
+```bash
+# 构建生产镜像
+docker compose -f docker-compose.prod.yml build
+
+# 启动
+docker compose -f docker-compose.prod.yml up -d
+
+# 查看
+# 前端: http://localhost
+# API:  http://localhost:8000 (Swagger: /docs)
+
+# 停止
+docker compose -f docker-compose.prod.yml down
+```
+
+注意：
+- 如需自定义环境变量，复制 `.env.example` 为 `.env` 并按需修改，再通过 compose 的 environment 注入或扩展 `docker-compose.prod.yml`。
+- Windows 与 Linux 使用同样命令即可（需安装 Docker Desktop / Docker Engine）。
+- 生产环境建议在 API 前增加反向代理（Nginx/Traefik）和 HTTPS 证书（Let’s Encrypt）。
 
 常用环境变量（.env）：
 - DATABASE_URL：数据库连接串（例：postgresql+psycopg2://user:pass@host:5432/db 或 sqlite+pysqlite:///./dev.db）

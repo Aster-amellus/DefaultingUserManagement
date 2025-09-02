@@ -1,5 +1,4 @@
-# syntax=docker/dockerfile:1
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,12 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install uv and dependencies via uv
-RUN pip install --upgrade pip && pip install uv
 COPY requirements.txt /app/requirements.txt
 RUN uv pip install --system -r requirements.txt
 
-COPY app /app/app
+# Copy the rest of the source so Alembic and configs are inside the image
+COPY . /app
 
 EXPOSE 8000
 
